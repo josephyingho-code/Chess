@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>棋逢Kam敵：破防局</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --navy-deep: #020813;
+            --navy-luxury: #071936;
+            --gold-accent: #D4AF37;
+            --crimson-danger: #E11D48;
+        }
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at 50% 12%, #0a2246 0%, #040d1a 55%, #010409 100%);
+            color: #F8FAFC;
+            font-family: "PingFang HK", "Microsoft JhengHei", "Noto Sans HK", sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        .serif-font {
+            font-family: "Songti TC", "PMingLiU", "Noto Serif TC", serif;
+        }
+        .luxury-panel {
+            background: linear-gradient(145deg, rgba(10, 31, 64, 0.72) 0%, rgba(3, 10, 22, 0.92) 100%);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(212, 175, 55, 0.32);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .board-shell {
+            border: 2px solid rgba(212, 175, 55, 0.65);
+            box-shadow: 0 20px 55px rgba(0, 0, 0, 0.9), 0 0 28px rgba(0, 59, 112, 0.55);
+        }
+        @keyframes screen-shake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-7px, 3px); }
+            40% { transform: translate(7px, -4px); }
+            60% { transform: translate(-5px, -2px); }
+            80% { transform: translate(5px, 3px); }
+        }
+        .shake-active {
+            animation: screen-shake 0.34s ease-in-out;
+        }
+        @keyframes bubble-pop {
+            0% { opacity: 0; transform: translateY(5px) scale(0.97); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .taunt-pop {
+            animation: bubble-pop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body id="mainBody" class="h-screen w-screen flex flex-col justify-between items-center relative overflow-hidden px-2.5 py-2">
+
+    <!-- Red Damage Flash Overlay -->
+    <div id="damageVignette" class="pointer-events-none fixed inset-0 bg-red-900/0 transition-colors duration-300 z-40"></div>
+
+    <!-- Top Header: Clean Trendy Title + Voice Controls Only (Zero Bank Banner, Zero Undo/Restart) -->
+    <header class="w-full max-w-xl z-20 shrink-0">
+        <div class="luxury-panel rounded-2xl px-3.5 py-2 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <h1 class="text-sm sm:text-base font-black tracking-wider text-amber-200 serif-font">
+                    棋逢Kam敵：破防局
+                </h1>
+            </div>
+
+            <div class="flex items-center space-x-1.5">
+                <button id="replayBtn" class="px-2.5 h-8 sm:h-9 rounded-xl bg-slate-900/90 border border-amber-400/35 flex items-center justify-center text-xs font-bold text-amber-200 hover:border-amber-400 active:scale-95 transition cursor-pointer" title="重聽呢句毒舌">
+                    🔁 重聽
+                </button>
+                <button id="voiceBtn" class="px-2.5 h-8 sm:h-9 rounded-xl bg-slate-900/90 border border-amber-400/35 flex items-center justify-center text-xs font-bold text-emerald-300 hover:border-amber-400 active:scale-95 transition cursor-pointer" title="開關粵語語音">
+                    🔊 粵語發聲
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Opponent Toxic Dialogue Bubble & Willpower Progress Bar -->
+    <section class="w-full max-w-xl z-20 shrink-0 my-1.5">
+        <div class="luxury-panel rounded-2xl p-3 flex flex-col gap-2">
+            <div class="flex items-start space-x-2.5">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#003B70] to-slate-950 border border-amber-400/60 flex items-center justify-center text-xl shrink-0 shadow-md relative">
+                    <span id="rivalAvatar">😒</span>
+                    <span id="aiThinkingDot" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p id="tauntBubble" class="taunt-pop text-xs sm:text-sm font-bold text-slate-100 leading-relaxed">
+                        「你棚棋真係好Kick呀！Kam到連旺角惠豐中心花旗銀行門口個保安都唔畀你入啦！智商負資產仲學人落場，陣間大破防唔好喊呀免費仔！」
+                    </p>
+                </div>
+            </div>
+
+            <!-- Willpower (心態防線 / 意志力) Progress Bar -->
+            <div class="flex items-center space-x-2.5 pt-1.5 border-t border-slate-800/80">
+                <span class="text-[11px] font-black text-amber-300 shrink-0 tracking-wider">心態防線 (意志力)</span>
+                <div class="flex-1 h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                    <div id="willpowerFill" class="h-full rounded-full bg-gradient-to-r from-rose-600 via-amber-400 to-emerald-400 transition-all duration-300" style="width: 100%;"></div>
+                </div>
+                <span id="willpowerText" class="text-[11px] font-black text-amber-200 w-9 text-right">100%</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main 3D-Styled HTML5 Canvas Xiangqi Board -->
+    <main class="flex-1 w-full max-w-xl flex items-center justify-center relative z-10 min-h-0">
+        <div id="boardWrap" class="w-full h-full flex items-center justify-center relative">
+            <canvas id="xiangqiCanvas" class="rounded-2xl board-shell cursor-pointer"></canvas>
+
+            <!-- Center Callout Flash (將軍 / 斬倉) -->
+            <div id="centerBanner" class="pointer-events-none hidden absolute inset-0 flex items-center justify-center z-30">
+                <div id="centerBannerText" class="px-6 py-2.5 rounded-2xl bg-red-950/95 border-2 border-amber-400 text-2xl sm:text-3xl font-black text-amber-200 serif-font shadow-[0_0_40px_rgba(225,29,72,0.95)]">
+                    將軍 Call Loan！
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Initial Start Modal (Unlocks Cantonese TTS & Web Audio API on Mobile/Desktop) -->
+    <div id="startModal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-5 z-50">
+        <div class="max-w-sm w-full luxury-panel rounded-3xl p-6 text-center border border-amber-400/50">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-600 to-slate-950 border border-amber-400/60 flex items-center justify-center text-3xl mx-auto mb-3 shadow-xl">
+                <span>🤡</span>
+            </div>
+            <h2 class="text-2xl font-black text-amber-200 serif-font mb-1">
+                棋逢Kam敵：破防局
+            </h2>
+    <!-- Initial Start Modal (Ultra Minimal: Title + Start Button ONLY) -->
+    <div id="startModal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-5 z-50">
+        <div class="max-w-xs w-full luxury-panel rounded-3xl px-6 py-10 text-center border border-amber-400/50">
+            <h2 class="text-2xl sm:text-3xl font-black text-amber-200 serif-font tracking-wider mb-8">
+                棋逢Kam敵：破防局
+            </h2>
+            <button id="enterGameBtn" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 text-slate-950 font-black text-lg tracking-widest shadow-[0_0_25px_rgba(212,175,55,0.5)] hover:brightness-110 active:scale-95 transition cursor-pointer">
+                開局
+            </button>
+        </div>
+    </div>
+
+    <!-- End Game Modal (Only appears on Checkmate or 0% Willpower) -->
+    <div id="endModal" class="hidden fixed inset-0 bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-5 z-50">
+        <div class="max-w-sm w-full luxury-panel rounded-3xl p-6 text-center border border-rose-500/60">
+            <div id="endEmoji" class="text-4xl mb-2">📉</div>
+            <h2 id="endHeading" class="text-2xl font-black text-amber-300 serif-font mb-1">
+                大破防・強制斬倉
+            </h2>
+            <p id="endSubtext" class="text-xs text-rose-300 font-bold mb-4"></p>
+            <div id="endQuote" class="bg-slate-950/90 border-l-4 border-rose-600 rounded-xl p-3.5 text-left text-xs sm:text-sm text-slate-100 font-bold mb-6 leading-relaxed"></div>
+            <button id="restartAfterEndBtn" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 text-slate-950 font-black text-base tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition cursor-pointer">
+                唔忿氣・再交智商稅
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. TOXIC CANTONESE DIALOGUE BANK (惠豐中心花旗銀行 + 00後潮語)
+         * ============================================================================
+         */
+        const INSULT_POOLS = {
+            opening: [
+                "入得旺角惠豐中心花旗銀行，我仲以為你有幾分身家同腦袋，點知望落成個Kam撚散戶咁款！快手行啦免費仔，咪阻住我收工！",
+                "喂，你棚棋未開波已經聞到陣窮酸味，真係好Kick呀！惠豐中心花旗批按揭都嫌你腦部負資產，準備好大破防未呀小丑？",
+                "坐低咗就無得悔棋架啦Kam撚！睇你隻手騰騰震好似去惠豐中心花旗排隊借財仔咁，陣間TU跌穿底俾我Call Loan斬倉唔好喊呀！"
+            ],
+            normalMove: [
+                "嘩，行成咁都有嘅？真係好Kick呀！你呢步棋拎去惠豐中心花旗銀行申請按揭，個TU信貸評級肯定係負無限分呀Kam撚！",
+                "你係咪交緊智商稅呀？行埋晒啲00後都嫌老土嘅自殺棋，去惠豐中心花旗開個兒童儲蓄戶口都嫌你未夠班啦免費仔！",
+                "散戶即係散戶，思維仲窄過旺角地鐵站條扶手電梯！睇你行棋咁Kam，成世做韭菜俾人割都係自己攞嚟賤，摺埋啦！",
+                "你個腦係咪做咗二按仲要斷埋供呀？行步棋都蠢過人，惠豐中心花旗門口部ATM提款機都識捉棋過你啦廢柴！",
+                "真心問句，你平時係咪專買垃圾仙股坐艇嗰啲大水魚嚟？行呢步臭棋簡直係主動申請腦部破產，去破產管理署排隊啦小丑！",
+                "睇你推隻棋個死款，畏首畏尾成隻驚青狗咁！連惠豐中心花旗銀行個櫃員阿姐望到你步棋都忍唔住翻白眼呀，真係好Kick！",
+                "唔怪得你銀行戶口長期得雙位數啦，原來連捉盤象棋都零邏輯！你呢種智商欠費嘅免費仔，快啲摺埋返屋企躺平啦！",
+                "笑死，你覺得呢步好型呀？喺我眼入面你戴緊小丑面具咋！成個陣穿晒窿好似負資產樓盤咁，仲喺度自我感覺良好！",
+                "行完呢步你自己有冇尷尬癌發作？我要係你，即刻落惠豐中心地庫搭車返屋企匿埋算啦，唔好出嚟獻世啦Kam撚！",
+                "你每行一步都刷新緊人類智商下限！連基本防守都唔識，呢個局勢連惠豐中心花旗批個債務重組都救你唔到呀！",
+                "呢步棋完美反映咗你個人生——毫無方向、全線虧損、TU跌穿底等緊被人Call Loan斬倉！真係睇見都替你可憐呀！"
+            ],
+            blunderMove: [
+                "哈哈哈哈！主動送頭？你個腦真係嚴重負資產喎！快啲落旺角惠豐中心花旗銀行排隊問下有無得借腦細胞啦，世紀級Kam撚！",
+                "嘩！真係好Kick呀！白白送隻棋俾我強制斬倉，你平時出街係咪都係雙手奉上成副身家俾騙徒嗰啲極品交智商稅水魚嚟㗎？",
+                "大型破防現場呀！自己伸個頭埋嚟俾我Call Loan？蠢到呢個境界，連破產管理署都唔想收你個File呀小丑！"
+            ],
+            aiCapturesMajor: [
+                "啪！強制斬倉！隻主力車馬炮就咁無咗，好似你喺惠豐中心花旗個孖展戶口一日清零咁爽快！大破防未呀免費仔？",
+                "多謝老細交智商稅！連隻大棋都保唔住，你棚棋已經資不抵債啦！快啲落惠豐中心樓下搵財仔借錢贖返隻棋啦，哈哈！",
+                "直接收割你隻主力！睇你個樣即刻黑晒面大破防，真係好治癒呀！Kam撚無論喺金融市場定棋盤都係負責送頭㗎咋！"
+            ],
+            aiCapturesMinor: [
+                "又割你一茬韭菜！連粒兵仔都守唔住，好似你每個月糧尾連惠豐中心花旗最低結餘都湊唔夠咁肉酸呀，摺埋啦！",
+                "一粒一粒咁清你袋！睇住你慢性破產、TU跌穿底又無力反抗個Kam樣，真係比中六合彩更開心！",
+                "唔好扁嘴啦小丑，反正你成世人都慣咗蝕底同交智商稅㗎啦，輸多隻卒仔當碎銀跌咗落彌敦道坑渠囉！"
+            ],
+            playerCaptures: [
+                "執到粒棄子就High到以為自己坐正惠豐中心花旗銀行頂樓做大班？典型散戶思維，贏粒糖輸間廠呀Kam撚！",
+                "嘩，食咗我一隻棋就笑到成個小丑咁？嗰粒係我施捨俾你嘅魚餌嚟咋，陣間連本帶利Call爆你Loan呀免費仔！",
+                "真係好Kick！執到少少甜頭就飄晒，你知唔知自己後防已經穿晒窿等緊被破產管理署接管呀？"
+            ],
+            aiChecks: [
+                "將軍呀Kam撚！惠豐中心花旗銀行正式向你發出Call Loan強制斬倉通知書！隻老帥驚到震晒，直接大破防投降啦你！",
+                "將軍！走投無路啦可？睇你隻帥好似欠債幾千萬、TU跌穿底匿喺公屋避風頭咁，幾時去破產管理署簽紙呀小丑？",
+                "又將軍！連老本都俾我抄埋，惠豐中心花旗都批唔出按揭救你個爛攤子啦，直接摺埋退出象棋界啦廢柴！"
+            ],
+            playerChecks: [
+                "將軍？你呢啲蚊型攻勢好意思叫將軍？好似你拎住一百蚊入惠豐中心花旗話想開私人銀行VIP一樣咁搞笑呀Kam撚！",
+                "垂死掙扎嘅小丑戲碼！無力就咪學人虛張聲勢啦，睇你以為自己好威個Kam樣真係好Kick呀！"
+            ],
+            idleTimeout: [
+                "喂！大腦Lag機定係交唔起電費呀？惠豐中心花旗銀行批個百億跨國按揭都快過你行一步棋啦，快手啦Kam撚！",
+                "發咩呆呀小丑？再諗落去你個腦都變永久負資產啦！定係已經嚇到大破防唔敢篤個Mon呀？",
+                "磨爛蓆都有極限㗎！你以為坐喺度唔郁就唔使還債同被人Call Loan呀？快啲行啦，出面彌敦道排緊隊笑你呀免費仔！",
+                "睇你思考人生個痛苦樣，真係好Kick！連下一步點死都計唔掂，無腦就隨便亂行一步早死早超生啦！"
+            ],
+            defeat: [
+                "徹底大破防・強制斬倉！由頭到尾你都好似個交智商稅嘅小丑咁俾我撳住嚟摩擦。快啲落惠豐中心花旗門口跪低反省下點解自己咁Kam啦，負資產廢柴！",
+                "正式宣布你腦部破產兼TU清零！棋又屎、心態又脆，連00後都不如！執返你棚爛棋去破產管理署報到啦，摺埋啦免費仔！"
+            ]
+        };
+
+        const RIVAL_FACES = ['😒', '🤡', '🥱', '😏', '🙄', '😈'];
+
+        /**
+         * ============================================================================
+         * 2. TRIPLE-LAYER CANTONESE VOICE (GitHub Pages / iOS / Android / Chrome Fix)
+         * ============================================================================
+         */
+        class AudioController {
+            constructor() {
+                this.ctx = null;
+                this.voiceOn = true;
+                this.cantoneseVoice = null;
+                this.hasNativeCantonese = false;
+                this.recentLines = new Set();
+                this.lastLine = "你棚棋真係好Kick呀！Kam到連旺角惠豐中心花旗銀行門口個保安都唔畀你入啦！智商負資產仲學人落場，陣間大破防唔好喊呀免費仔！";
+
+                // Dedicated HTML5 Audio element with no-referrer for GitHub Pages Cloud TTS fallback
+                this.cloudAudio = new Audio();
+                this.cloudAudio.referrerPolicy = 'no-referrer';
+                this.cloudAudio.preload = 'auto';
+
+                this.setupSpeechVoices();
+
+                // Prevent Chrome 15-second SpeechSynthesis freeze bug
+                setInterval(() => {
+                    if (this.voiceOn && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+                        window.speechSynthesis.resume();
+                    }
+                }, 4000);
+            }
+
+            unlockAudio() {
+                // 1. Unlock Web Audio API context
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!this.ctx && AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                    // Play a 1-frame silent buffer to force iOS Safari audio channel open
+                    if (this.ctx) {
+                        const buf = this.ctx.createBuffer(1, 1, 22050);
+                        const src = this.ctx.createBufferSource();
+                        src.buffer = buf;
+                        src.connect(this.ctx.destination);
+                        src.start(0);
+                    }
+                } catch (e) {}
+
+                // 2. Unlock HTML5 Audio element on user gesture
+                try {
+                    this.cloudAudio.muted = true;
+                    this.cloudAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+                    const p = this.cloudAudio.play();
+                    if (p !== undefined) {
+                        p.then(() => {
+                            this.cloudAudio.pause();
+                            this.cloudAudio.muted = false;
+                        }).catch(() => {
+                            this.cloudAudio.muted = false;
+                        });
+                    }
+                } catch (e) {}
+
+                // 3. Unlock Native SpeechSynthesis on user gesture
+                try {
+                    if ('speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                        window.speechSynthesis.resume();
+                        this.setupSpeechVoices();
+                    }
+                } catch (e) {}
+            }
+
+            setupSpeechVoices() {
+                if (!('speechSynthesis' in window)) return;
+                const pickVoice = () => {
+                    const list = window.speechSynthesis.getVoices();
+                    if (!list || !list.length) return;
+
+                    // Strict check for genuine Cantonese voices first
+                    const hk =
+                        list.find(v => v.lang && v.lang.toLowerCase() === 'zh-hk') ||
+                        list.find(v => v.lang && v.lang.toLowerCase() === 'yue-hk') ||
+                        list.find(v => v.lang && v.lang.toLowerCase().includes('yue')) ||
+                        list.find(v => v.lang && v.lang.toLowerCase().includes('hk')) ||
+                        list.find(v => v.name && (v.name.includes('Cantonese') || v.name.includes('粵語') || v.name.includes('Hong Kong') || v.name.includes('Sin-ji') || v.name.includes('Sin-Ji')));
+
+                    if (hk) {
+                        this.cantoneseVoice = hk;
+                        this.hasNativeCantonese = true;
+                    } else {
+                        this.cantoneseVoice = list.find(v => v.lang && v.lang.toLowerCase().startsWith('zh')) || null;
+                        this.hasNativeCantonese = false;
+                    }
+                };
+                pickVoice();
+                window.speechSynthesis.onvoiceschanged = pickVoice;
+            }
+
+            getLine(type) {
+                const pool = INSULT_POOLS[type] || INSULT_POOLS.normalMove;
+                const unused = pool.filter(item => !this.recentLines.has(item));
+                const candidates = unused.length > 0 ? unused : pool;
+                if (unused.length === 0) this.recentLines.clear();
+                const picked = candidates[Math.floor(Math.random() * candidates.length)];
+                this.recentLines.add(picked);
+                return picked;
+            }
+
+            // Cloud Cantonese TTS Stream (Works on GitHub Pages even when device has no Cantonese voice installed)
+            playCloudCantonese(text) {
+                try {
+                    const clean = text.replace(/[「」]/g, '').trim();
+                    const encoded = encodeURIComponent(clean);
+                    const urls = [
+                        `https://translate.google.com/translate_tts?ie=UTF-8&tl=yue&client=tw-ob&q=${encoded}`,
+                        `https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-HK&client=tw-ob&q=${encoded}`,
+                        `https://dict.youdao.com/dictvoice?audio=${encoded}&le=zh`
+                    ];
+
+                    let idx = 0;
+                    const tryNextUrl = () => {
+                        if (idx >= urls.length) {
+                            this.playNativeFallback(clean);
+                            return;
+                        }
+                        this.cloudAudio.src = urls[idx++];
+                        this.cloudAudio.playbackRate = 1.12;
+                        const playPromise = this.cloudAudio.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(() => tryNextUrl());
+                        }
+                    };
+                    this.cloudAudio.onerror = () => tryNextUrl();
+                    tryNextUrl();
+                } catch (e) {
+                    this.playNativeFallback(text);
+                }
+            }
+
+            playNativeFallback(text) {
+                if (!('speechSynthesis' in window)) return;
+                try {
+                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.resume();
+                    const utter = new SpeechSynthesisUtterance(text);
+                    if (this.cantoneseVoice) {
+                        utter.voice = this.cantoneseVoice;
+                        utter.lang = this.cantoneseVoice.lang;
+                    } else {
+                        utter.lang = 'zh-HK';
+                    }
+                    utter.rate = 1.12;
+                    utter.pitch = 0.88;
+                    utter.volume = 1.0;
+                    window.speechSynthesis.speak(utter);
+                } catch (e) {}
+            }
+
+            speakCantonese(text) {
+                if (text) this.lastLine = text;
+                if (!this.voiceOn) return;
+
+                if (!this.cantoneseVoice) this.setupSpeechVoices();
+
+                // Stop any ongoing speech before speaking the new taunt
+                try {
+                    this.cloudAudio.pause();
+                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                } catch (e) {}
+
+                // If native Cantonese TTS is verified available, use it AND monitor if it actually starts speaking within 350ms; otherwise immediately stream Cloud Cantonese TTS
+                if (this.hasNativeCantonese && 'speechSynthesis' in window) {
+                    try {
+                        window.speechSynthesis.resume();
+                        const utter = new SpeechSynthesisUtterance(this.lastLine);
+                        utter.voice = this.cantoneseVoice;
+                        utter.lang = this.cantoneseVoice.lang || 'zh-HK';
+                        utter.rate = 1.12;
+                        utter.pitch = 0.88;
+                        utter.volume = 1.0;
+
+                        let started = false;
+                        utter.onstart = () => { started = true; };
+                        utter.onerror = () => {
+                            if (!started) this.playCloudCantonese(this.lastLine);
+                        };
+
+                        window.speechSynthesis.speak(utter);
+
+                        setTimeout(() => {
+                            if (!started && !window.speechSynthesis.speaking) {
+                                this.playCloudCantonese(this.lastLine);
+                            }
+                        }, 350);
+                        return;
+                    } catch (e) {}
+                }
+
+                // Default to Cloud Cantonese TTS if device lacks native Cantonese voice or is on GitHub Pages
+                this.playCloudCantonese(this.lastLine);
+            }
+
+            playWoodClack(isCapture = false) {
+                if (!this.voiceOn) return;
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!this.ctx && AudioCtx) this.ctx = new AudioCtx();
+                    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+                    if (!this.ctx) return;
+
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = isCapture ? 'sawtooth' : 'triangle';
+                    osc.frequency.setValueAtTime(isCapture ? 160 : 300, now);
+                    osc.frequency.exponentialRampToValueAtTime(45, now + (isCapture ? 0.14 : 0.08));
+                    gain.gain.setValueAtTime(isCapture ? 0.42 : 0.28, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + (isCapture ? 0.15 : 0.09));
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + (isCapture ? 0.15 : 0.09));
+                } catch (e) {}
+            }
+
+            playCheckAlert() {
+                if (!this.voiceOn) return;
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!this.ctx && AudioCtx) this.ctx = new AudioCtx();
+                    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+                    if (!this.ctx) return;
+
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.exponentialRampToValueAtTime(38, now + 0.32);
+                    gain.gain.setValueAtTime(0.35, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.34);
+                } catch (e) {}
+            }
+        }
+
+        const audio = new AudioController();
+
+        /**
+         * ============================================================================
+         * 3. HARDCORE XIANGQI AI ENGINE (Alpha-Beta Pruning + Piece-Square Tables)
+         * ============================================================================
+         */
+        const PIECE_CHARS = {
+            '1': '帥', '2': '仕', '3': '相', '4': '傌', '5': '俥', '6': '炮', '7': '兵',
+            '-1': '將', '-2': '士', '-3': '象', '-4': '馬', '-5': '車', '-6': '砲', '-7': '卒'
+        };
+
+        const BASE_VALUE = { 1: 15000, 2: 150, 3: 150, 4: 350, 5: 780, 6: 390, 7: 90 };
+
+        // Positional Bonus Tables from Black's perspective (rows 0..9)
+        const PST_PAWN = [
+            [ 0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 0,  0,  0,  0,  0,  0,  0,  0,  0],
+            [ 6,  0, 12,  0, 20,  0, 12,  0,  6],
+            [14,  0, 20,  0, 28,  0, 20,  0, 14],
+            [36, 50, 60, 72, 80, 72, 60, 50, 36],
+            [52, 70, 85,100,115,100, 85, 70, 52],
+            [64, 85,105,125,140,125,105, 85, 64],
+            [58, 80, 98,120,130,120, 98, 80, 58],
+            [22, 32, 42, 54, 60, 54, 42, 32, 22]
+        ];
+
+        const PST_CHARIOT = [
+            [ -6, 14, 10, 20, 15, 20, 10, 14, -6],
+            [ 12, 22, 20, 30, 28, 30, 20, 22, 12],
+            [  8, 18, 16, 28, 26, 28, 16, 18,  8],
+            [ 14, 26, 24, 36, 36, 36, 24, 26, 14],
+            [ 20, 32, 30, 42, 42, 42, 30, 32, 20],
+            [ 26, 40, 38, 48, 48, 48, 38, 40, 26],
+            [ 32, 48, 46, 58, 60, 58, 46, 48, 32],
+            [ 30, 46, 44, 54, 56, 54, 44, 46, 30],
+            [ 36, 52, 48, 64, 62, 64, 48, 52, 36],
+            [ 22, 40, 36, 50, 48, 50, 36, 40, 22]
+        ];
+
+        const PST_HORSE = [
+            [ -5, -5,  0,  0,  0,  0,  0, -5, -5],
+            [ -5,  6, 16, 14,  6, 14, 16,  6, -5],
+            [  0, 14, 26, 30, 26, 30, 26, 14,  0],
+            [ 10, 22, 34, 40, 38, 40, 34, 22, 10],
+            [ 14, 28, 40, 48, 46, 48, 40, 28, 14],
+            [ 16, 34, 46, 58, 56, 58, 46, 34, 16],
+            [ 20, 40, 54, 68, 70, 68, 54, 40, 20],
+            [ 16, 36, 50, 70, 62, 70, 50, 36, 16],
+            [  6, 24, 34, 48, 34, 48, 34, 24,  6],
+            [ -8,  6, 14, 20, 10, 20, 14,  6, -8]
+        ];
+
+        const PST_CANNON = [
+            [  4,  6, 12, 18, 22, 18, 12,  6,  4],
+            [  4,  8, 12, 16, 20, 16, 12,  8,  4],
+            [  8, 14, 20, 28, 36, 28, 20, 14,  8],
+            [ 10, 14, 18, 26, 34, 26, 18, 14, 10],
+            [ 12, 18, 24, 32, 40, 32, 24, 18, 12],
+            [ 14, 20, 26, 34, 42, 34, 26, 20, 14],
+            [ 16, 22, 28, 36, 44, 36, 28, 22, 16],
+            [ 18, 24, 32, 38, 46, 38, 32, 24, 18],
+            [ 12, 18, 20, 26, 30, 26, 20, 18, 12],
+            [  6, 10, 14, 18, 20, 18, 14, 10,  6]
+        ];
+
+        function createInitialBoard() {
+            return [
+                [-5, -4, -3, -2, -1, -2, -3, -4, -5],
+                [ 0,  0,  0,  0,  0,  0,  0,  0,  0],
+                [ 0, -6,  0,  0,  0,  0,  0, -6,  0],
+                [-7,  0, -7,  0, -7,  0, -7,  0, -7],
+                [ 0,  0,  0,  0,  0,  0,  0,  0,  0],
+                [ 0,  0,  0,  0,  0,  0,  0,  0,  0],
+                [ 7,  0,  7,  0,  7,  0,  7,  0,  7],
+                [ 0,  6,  0,  0,  0,  0,  0,  6,  0],
+                [ 0,  0,  0,  0,  0,  0,  0,  0,  0],
+                [ 5,  4,  3,  2,  1,  2,  3,  4,  5]
+            ];
+        }
+
+        function onBoard(r, c) {
+            return r >= 0 && r < 10 && c >= 0 && c < 9;
+        }
+
+        function insidePalace(r, c, side) {
+            if (c < 3 || c > 5) return false;
+            return side > 0 ? (r >= 7 && r <= 9) : (r >= 0 && r <= 2);
+        }
+
+        function getPseudoMoves(b, side) {
+            const list = [];
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const p = b[r][c];
+                    if (p === 0 || Math.sign(p) !== side) continue;
+                    const type = Math.abs(p);
+
+                    if (type === 1) {
+                        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                            const nr = r + dr, nc = c + dc;
+                            if (insidePalace(nr, nc, side) && Math.sign(b[nr][nc]) !== side) {
+                                list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                            }
+                        }
+                    } else if (type === 2) {
+                        for (const [dr, dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]) {
+                            const nr = r + dr, nc = c + dc;
+                            if (insidePalace(nr, nc, side) && Math.sign(b[nr][nc]) !== side) {
+                                list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                            }
+                        }
+                    } else if (type === 3) {
+                        for (const [dr, dc] of [[-2,-2],[-2,2],[2,-2],[2,2]]) {
+                            const nr = r + dr, nc = c + dc;
+                            if (!onBoard(nr, nc)) continue;
+                            if (side > 0 && nr < 5) continue;
+                            if (side < 0 && nr > 4) continue;
+                            if (b[r + dr / 2][c + dc / 2] === 0 && Math.sign(b[nr][nc]) !== side) {
+                                list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                            }
+                        }
+                    } else if (type === 4) {
+                        const steps = [
+                            [-2,-1,-1,0], [-2,1,-1,0],
+                            [2,-1,1,0],   [2,1,1,0],
+                            [-1,-2,0,-1], [1,-2,0,-1],
+                            [-1,2,0,1],   [1,2,0,1]
+                        ];
+                        for (const [dr, dc, lr, lc] of steps) {
+                            const nr = r + dr, nc = c + dc;
+                            if (onBoard(nr, nc) && b[r + lr][c + lc] === 0 && Math.sign(b[nr][nc]) !== side) {
+                                list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                            }
+                        }
+                    } else if (type === 5) {
+                        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                            let nr = r + dr, nc = c + dc;
+                            while (onBoard(nr, nc)) {
+                                const target = b[nr][nc];
+                                if (target === 0) {
+                                    list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                                } else {
+                                    if (Math.sign(target) !== side) list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                                    break;
+                                }
+                                nr += dr; nc += dc;
+                            }
+                        }
+                    } else if (type === 6) {
+                        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+                            let nr = r + dr, nc = c + dc, jumped = false;
+                            while (onBoard(nr, nc)) {
+                                const target = b[nr][nc];
+                                if (!jumped) {
+                                    if (target === 0) list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                                    else jumped = true;
+                                } else {
+                                    if (target !== 0) {
+                                        if (Math.sign(target) !== side) list.push({ fr: r, fc: c, tr: nr, tc: nc });
+                                        break;
+                                    }
+                                }
+                                nr += dr; nc += dc;
+                            }
+                        }
+                    } else if (type === 7) {
+                        const nr = r + (side > 0 ? -1 : 1);
+                        if (onBoard(nr, c) && Math.sign(b[nr][c]) !== side) {
+                            list.push({ fr: r, fc: c, tr: nr, tc: c });
+                        }
+                        if ((side > 0 && r <= 4) || (side < 0 && r >= 5)) {
+                            for (const dc of [-1, 1]) {
+                                const nc = c + dc;
+                                if (onBoard(r, nc) && Math.sign(b[r][nc]) !== side) {
+                                    list.push({ fr: r, fc: c, tr: r, tc: nc });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
+        function generalsFacingEachOther(b) {
+            let rRow = -1, rCol = -1, bRow = -1, bCol = -1;
+            for (let r = 0; r < 3; r++) {
+                for (let c = 3; c <= 5; c++) {
+                    if (b[r][c] === -1) { bRow = r; bCol = c; }
+                }
+            }
+            for (let r = 7; r < 10; r++) {
+                for (let c = 3; c <= 5; c++) {
+                    if (b[r][c] === 1) { rRow = r; rCol = c; }
+                }
+            }
+            if (rRow === -1 || bRow === -1 || rCol !== bCol) return false;
+            for (let r = bRow + 1; r < rRow; r++) {
+                if (b[r][rCol] !== 0) return false;
+            }
+            return true;
+        }
+
+        function isKingInCheck(b, side) {
+            if (generalsFacingEachOther(b)) return true;
+            let kr = -1, kc = -1;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 3; c <= 5; c++) {
+                    if (b[r][c] === side) { kr = r; kc = c; break; }
+                }
+            }
+            if (kr === -1) return true;
+            const enemyMoves = getPseudoMoves(b, -side);
+            return enemyMoves.some(m => m.tr === kr && m.tc === kc);
+        }
+
+        function getLegalMoves(b, side) {
+            const pseudo = getPseudoMoves(b, side);
+            const legal = [];
+            for (const m of pseudo) {
+                const cap = b[m.tr][m.tc];
+                const mov = b[m.fr][m.fc];
+                b[m.tr][m.tc] = mov;
+                b[m.fr][m.fc] = 0;
+                if (!isKingInCheck(b, side)) {
+                    legal.push({ ...m, captured: cap });
+                }
+                b[m.fr][m.fc] = mov;
+                b[m.tr][m.tc] = cap;
+            }
+            return legal;
+        }
+
+        function evaluateBoard(b) {
+            let net = 0;
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const p = b[r][c];
+                    if (p === 0) continue;
+                    const side = Math.sign(p); // -1 is AI Black, +1 is Player Red
+                    const t = Math.abs(p);
+                    let val = BASE_VALUE[t];
+
+                    const rowIdx = side < 0 ? r : (9 - r);
+                    if (t === 7) val += PST_PAWN[rowIdx][c];
+                    else if (t === 5) val += PST_CHARIOT[rowIdx][c];
+                    else if (t === 4) val += PST_HORSE[rowIdx][c];
+                    else if (t === 6) val += PST_CANNON[rowIdx][c];
+                    else if (t === 2 || t === 3) val += (rowIdx === 2 && c === 4) ? 24 : 0;
+
+                    net += (-side) * val;
+                }
+            }
+            return net;
+        }
+
+        function scoreMoveOrder(b, m) {
+            const victim = Math.abs(b[m.tr][m.tc]);
+            const attacker = Math.abs(b[m.fr][m.fc]);
+            let priority = 0;
+            if (victim !== 0) {
+                priority += BASE_VALUE[victim] * 12 - BASE_VALUE[attacker];
+            }
+            if (m.tc >= 3 && m.tc <= 5 && m.tr >= 4 && m.tr <= 8) priority += 18;
+            return priority;
+        }
+
+        function alphaBeta(b, depth, alpha, beta, maximizingPlayer) {
+            if (depth <= 0) return evaluateBoard(b);
+
+            const side = maximizingPlayer ? -1 : 1;
+            const moves = getPseudoMoves(b, side);
+            moves.sort((a, b2) => scoreMoveOrder(b, b2) - scoreMoveOrder(b, a));
+
+            if (maximizingPlayer) {
+                let best = -Infinity;
+                for (const m of moves) {
+                    const cap = b[m.tr][m.tc];
+                    if (cap === 1) return 95000 + depth * 400;
+                    const mov = b[m.fr][m.fc];
+                    b[m.tr][m.tc] = mov;
+                    b[m.fr][m.fc] = 0;
+
+                    if (!generalsFacingEachOther(b)) {
+                        const score = alphaBeta(b, depth - 1, alpha, beta, false);
+                        if (score > best) best = score;
+                        if (score > alpha) alpha = score;
+                    }
+
+                    b[m.fr][m.fc] = mov;
+                    b[m.tr][m.tc] = cap;
+                    if (beta <= alpha) break;
+                }
+                return best === -Infinity ? evaluateBoard(b) : best;
+            } else {
+                let best = Infinity;
+                for (const m of moves) {
+                    const cap = b[m.tr][m.tc];
+                    if (cap === -1) return -95000 - depth * 400;
+                    const mov = b[m.fr][m.fc];
+                    b[m.tr][m.tc] = mov;
+                    b[m.fr][m.fc] = 0;
+
+                    if (!generalsFacingEachOther(b)) {
+                        const score = alphaBeta(b, depth - 1, alpha, beta, true);
+                        if (score < best) best = score;
+                        if (score < beta) beta = score;
+                    }
+
+                    b[m.fr][m.fc] = mov;
+                    b[m.tr][m.tc] = cap;
+                    if (beta <= alpha) break;
+                }
+                return best === Infinity ? evaluateBoard(b) : best;
+            }
+        }
+
+        function findBestAiMove(b) {
+            const legal = getLegalMoves(b, -1);
+            if (!legal.length) return null;
+
+            legal.sort((a, b2) => scoreMoveOrder(b, b2) - scoreMoveOrder(b, a));
+            let bestMove = legal[0];
+            let bestVal = -Infinity;
+
+            for (const m of legal) {
+                const cap = b[m.tr][m.tc];
+                const mov = b[m.fr][m.fc];
+                b[m.tr][m.tc] = mov;
+                b[m.fr][m.fc] = 0;
+
+                // Instant checkmate detection
+                const playerReplies = getLegalMoves(b, 1);
+                if (playerReplies.length === 0) {
+                    b[m.fr][m.fc] = mov;
+                    b[m.tr][m.tc] = cap;
+                    return m;
+                }
+
+                const val = alphaBeta(b, 3, -Infinity, Infinity, false);
+                b[m.fr][m.fc] = mov;
+                b[m.tr][m.tc] = cap;
+
+                if (val > bestVal) {
+                    bestVal = val;
+                    bestMove = m;
+                }
+            }
+            return bestMove;
+        }
+
+        /**
+         * ============================================================================
+         * 4. BOARD RENDERING & GAMEPLAY STATE CONTROLLER
+         * ============================================================================
+         */
+        const canvas = document.getElementById('xiangqiCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let board = createInitialBoard();
+        let currentTurn = 1; // 1 = Player (Red), -1 = Toxic AI (Black)
+        let isPlaying = false;
+        let selectedCell = null;
+        let legalTargets = [];
+        let lastMoveRecord = null;
+        let willpower = 100;
+        let idleTimer = null;
+        let layout = { cs: 48, ox: 28, oy: 28 };
+
+        function triggerTaunt(category, willpowerLoss = 0) {
+            const line = audio.getLine(category);
+            document.getElementById('rivalAvatar').textContent = RIVAL_FACES[Math.floor(Math.random() * RIVAL_FACES.length)];
+
+            const bubble = document.getElementById('tauntBubble');
+            bubble.classList.remove('taunt-pop');
+            void bubble.offsetWidth;
+            bubble.textContent = `「${line}」`;
+            bubble.classList.add('taunt-pop');
+
+            audio.speakCantonese(line);
+
+            if (willpowerLoss > 0) {
+                reduceWillpower(willpowerLoss);
+            }
+        }
+
+        function reduceWillpower(loss) {
+            willpower = Math.max(0, willpower - loss);
+            document.getElementById('willpowerFill').style.width = `${willpower}%`;
+            document.getElementById('willpowerText').textContent = `${Math.round(willpower)}%`;
+
+            if (loss >= 8) {
+                const body = document.getElementById('mainBody');
+                const vig = document.getElementById('damageVignette');
+                body.classList.remove('shake-active');
+                void body.offsetWidth;
+                body.classList.add('shake-active');
+                vig.style.backgroundColor = 'rgba(225, 29, 72, 0.28)';
+                setTimeout(() => {
+                    vig.style.backgroundColor = 'rgba(225, 29, 72, 0)';
+                }, 280);
+            }
+
+            if (willpower <= 0 && isPlaying) {
+                finishMatch(
+                    '🤡',
+                    '心態大破防・強制斬倉',
+                    '你條心態防線已經跌到 0%，喺惠豐中心花旗代表面前徹底大破防社死！',
+                    audio.getLine('defeat')
+                );
+            }
+        }
+
+        function flashCenterBanner(text) {
+            const banner = document.getElementById('centerBanner');
+            document.getElementById('centerBannerText').textContent = text;
+            banner.classList.remove('hidden');
+            setTimeout(() => banner.classList.add('hidden'), 1150);
+        }
+
+        function restartIdleWatch() {
+            if (idleTimer) clearTimeout(idleTimer);
+            if (!isPlaying || currentTurn !== 1) return;
+            idleTimer = setTimeout(() => {
+                if (isPlaying && currentTurn === 1) {
+                    triggerTaunt('idleTimeout', 8);
+                    restartIdleWatch();
+                }
+            }, 12000);
+        }
+
+        function finishMatch(emoji, heading, subtext, quote) {
+            isPlaying = false;
+            if (idleTimer) clearTimeout(idleTimer);
+            document.getElementById('endEmoji').textContent = emoji;
+            document.getElementById('endHeading').textContent = heading;
+            document.getElementById('endSubtext').textContent = subtext;
+            document.getElementById('endQuote').textContent = `「${quote}」`;
+            document.getElementById('endModal').classList.remove('hidden');
+            audio.speakCantonese(quote);
+        }
+
+        function fitCanvas() {
+            const wrap = document.getElementById('boardWrap');
+            const rect = wrap.getBoundingClientRect();
+            const availW = Math.max(240, rect.width - 4);
+            const availH = Math.max(270, rect.height - 4);
+
+            const aspect = 9 / 10;
+            let w = availW;
+            let h = w / aspect;
+            if (h > availH) {
+                h = availH;
+                w = h * aspect;
+            }
+
+            canvas.width = Math.floor(w);
+            canvas.height = Math.floor(h);
+
+            const cs = Math.min(canvas.width / 9.25, canvas.height / 10.25);
+            layout.cs = cs;
+            layout.ox = (canvas.width - cs * 8) / 2;
+            layout.oy = (canvas.height - cs * 9) / 2;
+
+            drawChessboard();
+        }
+
+        function gridToPixel(r, c) {
+            return {
+                x: layout.ox + c * layout.cs,
+                y: layout.oy + r * layout.cs
+            };
+        }
+
+        function pixelToGrid(x, y) {
+            const c = Math.round((x - layout.ox) / layout.cs);
+            const r = Math.round((y - layout.oy) / layout.cs);
+            if (onBoard(r, c)) {
+                const pt = gridToPixel(r, c);
+                if (Math.hypot(x - pt.x, y - pt.y) <= layout.cs * 0.48) {
+                    return { r, c };
+                }
+            }
+            return null;
+        }
+
+        function drawCornerTicks(cx, cy, s) {
+            const gap = s * 0.08;
+            const len = s * 0.18;
+            ctx.strokeStyle = 'rgba(212, 175, 55, 0.55)';
+            ctx.lineWidth = 1.2;
+            const dirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
+            dirs.forEach(([dx, dy]) => {
+                const sx = cx + dx * gap;
+                const sy = cy + dy * gap;
+                if (sx > layout.ox + 2 && sx < layout.ox + 8 * s - 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy);
+                    ctx.lineTo(sx + dx * len, sy);
+                    ctx.moveTo(sx, sy);
+                    ctx.lineTo(sx, sy + dy * len);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        function drawChessboard() {
+            const w = canvas.width, h = canvas.height;
+            const { cs, ox, oy } = layout;
+            ctx.clearRect(0, 0, w, h);
+
+            // Luxury Obsidian & Deep Navy Board Surface
+            const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+            bgGrad.addColorStop(0, '#041226');
+            bgGrad.addColorStop(0.5, '#071F3E');
+            bgGrad.addColorStop(1, '#020813');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Outer Gold Frame
+            ctx.strokeStyle = 'rgba(212, 175, 55, 0.78)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(ox - cs * 0.42, oy - cs * 0.42, cs * 8.84, cs * 9.84);
+
+            // Grid Lines
+            ctx.strokeStyle = 'rgba(212, 175, 55, 0.52)';
+            ctx.lineWidth = 1.3;
+
+            for (let r = 0; r < 10; r++) {
+                ctx.beginPath();
+                ctx.moveTo(ox, oy + r * cs);
+                ctx.lineTo(ox + 8 * cs, oy + r * cs);
+                ctx.stroke();
+            }
+
+            for (let c = 0; c < 9; c++) {
+                if (c === 0 || c === 8) {
+                    ctx.beginPath();
+                    ctx.moveTo(ox + c * cs, oy);
+                    ctx.lineTo(ox + c * cs, oy + 9 * cs);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(ox + c * cs, oy);
+                    ctx.lineTo(ox + c * cs, oy + 4 * cs);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(ox + c * cs, oy + 5 * cs);
+                    ctx.lineTo(ox + c * cs, oy + 9 * cs);
+                    ctx.stroke();
+                }
+            }
+
+            // Palace X-Lines
+            ctx.beginPath();
+            ctx.moveTo(ox + 3 * cs, oy); ctx.lineTo(ox + 5 * cs, oy + 2 * cs);
+            ctx.moveTo(ox + 5 * cs, oy); ctx.lineTo(ox + 3 * cs, oy + 2 * cs);
+            ctx.moveTo(ox + 3 * cs, oy + 7 * cs); ctx.lineTo(ox + 5 * cs, oy + 9 * cs);
+            ctx.moveTo(ox + 5 * cs, oy + 7 * cs); ctx.lineTo(ox + 3 * cs, oy + 9 * cs);
+            ctx.stroke();
+
+            // Cannon & Pawn Marks
+            const markCoords = [
+                [2,1],[2,7],[7,1],[7,7],
+                [3,0],[3,2],[3,4],[3,6],[3,8],
+                [6,0],[6,2],[6,4],[6,6],[6,8]
+            ];
+            markCoords.forEach(([r, c]) => {
+                const pt = gridToPixel(r, c);
+                drawCornerTicks(pt.x, pt.y, cs);
+            });
+
+            // River Inscription
+            ctx.save();
+            ctx.fillStyle = 'rgba(212, 175, 55, 0.72)';
+            ctx.font = `900 ${Math.floor(cs * 0.42)}px "Songti TC", "Noto Serif TC", serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('楚 河', ox + 2 * cs, oy + 4.5 * cs);
+            ctx.fillText('漢 界', ox + 6 * cs, oy + 4.5 * cs);
+            ctx.restore();
+
+            // Last Move Highlight Rings
+            if (lastMoveRecord) {
+                [{ r: lastMoveRecord.fr, c: lastMoveRecord.fc }, { r: lastMoveRecord.tr, c: lastMoveRecord.tc }].forEach(cell => {
+                    const pos = gridToPixel(cell.r, cell.c);
+                    ctx.save();
+                    ctx.strokeStyle = '#38BDF8';
+                    ctx.lineWidth = 2.2;
+                    ctx.setLineDash([4, 3]);
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, cs * 0.45, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                });
+            }
+
+            // Draw All 3D Pieces
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const p = board[r][c];
+                    if (p === 0) continue;
+                    const pos = gridToPixel(r, c);
+                    const isSelected = selectedCell && selectedCell.r === r && selectedCell.c === c;
+                    draw3DPiece(pos.x, pos.y, p, cs * 0.43, isSelected);
+                }
+            }
+
+            // Draw Legal Move Indicators
+            legalTargets.forEach(m => {
+                const pos = gridToPixel(m.tr, m.tc);
+                ctx.save();
+                if (board[m.tr][m.tc] !== 0) {
+                    ctx.strokeStyle = '#F43F5E';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, cs * 0.45, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'rgba(212, 175, 55, 0.92)';
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, cs * 0.14, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            });
+        }
+
+        function draw3DPiece(x, y, code, rad, isSel) {
+            const isRed = code > 0;
+            ctx.save();
+            if (isSel) {
+                y -= 4;
+                ctx.shadowColor = '#FDE047';
+                ctx.shadowBlur = 18;
+            } else {
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+                ctx.shadowBlur = 7;
+                ctx.shadowOffsetY = 3;
+            }
+
+            // Outer Metallic Bezel
+            const rimGrad = ctx.createLinearGradient(x - rad, y - rad, x + rad, y + rad);
+            if (isRed) {
+                rimGrad.addColorStop(0, '#FFF3B0');
+                rimGrad.addColorStop(0.5, '#D4AF37');
+                rimGrad.addColorStop(1, '#78530A');
+            } else {
+                rimGrad.addColorStop(0, '#94A3B8');
+                rimGrad.addColorStop(0.5, '#334155');
+                rimGrad.addColorStop(1, '#0F172A');
+            }
+            ctx.beginPath();
+            ctx.arc(x, y, rad, 0, Math.PI * 2);
+            ctx.fillStyle = rimGrad;
+            ctx.fill();
+
+            // Inner 3D Dome
+            const coreGrad = ctx.createRadialGradient(x - rad * 0.22, y - rad * 0.22, rad * 0.1, x, y, rad * 0.85);
+            if (isRed) {
+                coreGrad.addColorStop(0, '#B91C1C');
+                coreGrad.addColorStop(0.75, '#7F1D1D');
+                coreGrad.addColorStop(1, '#450A0A');
+            } else {
+                coreGrad.addColorStop(0, '#0F294A');
+                coreGrad.addColorStop(0.75, '#061529');
+                coreGrad.addColorStop(1, '#020813');
+            }
+            ctx.beginPath();
+            ctx.arc(x, y, rad * 0.84, 0, Math.PI * 2);
+            ctx.fillStyle = coreGrad;
+            ctx.fill();
+
+            // Engraved Character
+            ctx.fillStyle = isRed ? '#FEF08A' : '#38BDF8';
+            ctx.font = `900 ${Math.floor(rad * 1.05)}px "Songti TC", "Noto Serif TC", serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(PIECE_CHARS[String(code)], x, y + 1);
+            ctx.restore();
+        }
+
+        function handleBoardClick(e) {
+            if (!isPlaying || currentTurn !== 1) return;
+            audio.unlockAudio();
+
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const cell = pixelToGrid(clientX - rect.left, clientY - rect.top);
+            if (!cell) return;
+
+            if (selectedCell) {
+                const chosenMove = legalTargets.find(m => m.tr === cell.r && m.tc === cell.c);
+                if (chosenMove) {
+                    executePlayerMove(chosenMove);
+                    return;
+                }
+            }
+
+            if (board[cell.r][cell.c] > 0) {
+                selectedCell = cell;
+                legalTargets = getLegalMoves(board, 1).filter(m => m.fr === cell.r && m.fc === cell.c);
+                audio.playWoodClack(false);
+                drawChessboard();
+            } else {
+                selectedCell = null;
+                legalTargets = [];
+                drawChessboard();
+            }
+        }
+
+        function executePlayerMove(move) {
+            const evalBefore = evaluateBoard(board);
+
+            const cap = board[move.tr][move.tc];
+            const mov = board[move.fr][move.fc];
+            board[move.tr][move.tc] = mov;
+            board[move.fr][move.fc] = 0;
+
+            selectedCell = null;
+            legalTargets = [];
+            lastMoveRecord = move;
+
+            audio.playWoodClack(cap !== 0);
+            drawChessboard();
+
+            const evalAfter = evaluateBoard(board);
+            const isBlunder = (evalAfter - evalBefore) > 250;
+
+            // Check if AI is checkmated
+            const aiLegalMoves = getLegalMoves(board, -1);
+            if (aiLegalMoves.length === 0) {
+                finishMatch(
+                    '👑',
+                    '奇蹟反勝・打爆莊家',
+                    '你竟然頂住毒舌壓力，親手將死咗惠豐中心花旗代表！',
+                    '「無可能！你呢種散戶點可能贏到我？！一定係個系統出Bug！」'
+                );
+                return;
+            }
+
+            const aiChecked = isKingInCheck(board, -1);
+            if (aiChecked) {
+                audio.playCheckAlert();
+                flashCenterBanner('將軍！');
+                triggerTaunt('playerChecks', 2);
+            } else if (cap !== 0) {
+                triggerTaunt('playerCaptures', 3);
+            } else if (isBlunder) {
+                triggerTaunt('blunderMove', 10);
+            } else {
+                triggerTaunt('normalMove', 5);
+            }
+
+            if (!isPlaying) return;
+
+            currentTurn = -1;
+            if (idleTimer) clearTimeout(idleTimer);
+            document.getElementById('aiThinkingDot').classList.remove('hidden');
+
+            setTimeout(() => {
+                if (!isPlaying) return;
+                const aiMove = findBestAiMove(board);
+                document.getElementById('aiThinkingDot').classList.add('hidden');
+
+                if (!aiMove) return;
+
+                const aiCap = board[aiMove.tr][aiMove.tc];
+                const aiPiece = board[aiMove.fr][aiMove.fc];
+                board[aiMove.tr][aiMove.tc] = aiPiece;
+                board[aiMove.fr][aiMove.fc] = 0;
+                lastMoveRecord = aiMove;
+
+                audio.playWoodClack(aiCap !== 0);
+                drawChessboard();
+
+                const playerReplies = getLegalMoves(board, 1);
+                const playerInCheck = isKingInCheck(board, 1);
+
+                if (playerReplies.length === 0) {
+                    audio.playCheckAlert();
+                    finishMatch(
+                        '📉',
+                        '絕殺斬倉・負資產收場',
+                        '你已經被徹底將死，連惠豐中心花旗同破產管理署都救唔返你棚爛棋。',
+                        audio.getLine('defeat')
+                    );
+                    return;
+                }
+
+                if (playerInCheck) {
+                    audio.playCheckAlert();
+                    flashCenterBanner('將軍 Call Loan！');
+                    triggerTaunt('aiChecks', 14);
+                } else if (aiCap !== 0) {
+                    const isMajor = Math.abs(aiCap) === 4 || Math.abs(aiCap) === 5 || Math.abs(aiCap) === 6;
+                    triggerTaunt(isMajor ? 'aiCapturesMajor' : 'aiCapturesMinor', isMajor ? 15 : 8);
+                }
+
+                currentTurn = 1;
+                restartIdleWatch();
+            }, 250);
+        }
+
+        function launchNewMatch() {
+            audio.unlockAudio();
+            board = createInitialBoard();
+            currentTurn = 1;
+            selectedCell = null;
+            legalTargets = [];
+            lastMoveRecord = null;
+            willpower = 100;
+            isPlaying = true;
+
+            document.getElementById('willpowerFill').style.width = '100%';
+            document.getElementById('willpowerText').textContent = '100%';
+            document.getElementById('startModal').classList.add('hidden');
+            document.getElementById('endModal').classList.add('hidden');
+
+            fitCanvas();
+            triggerTaunt('opening', 0);
+            restartIdleWatch();
+        }
+
+        // Bindings
+        canvas.addEventListener('mousedown', handleBoardClick);
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            handleBoardClick(e);
+        }, { passive: false });
+
+        document.getElementById('enterGameBtn').addEventListener('click', launchNewMatch);
+        document.getElementById('restartAfterEndBtn').addEventListener('click', launchNewMatch);
+
+        document.getElementById('replayBtn').addEventListener('click', () => {
+            audio.unlockAudio();
+            audio.speakCantonese(audio.lastLine);
+        });
+
+        document.getElementById('voiceBtn').addEventListener('click', e => {
+            audio.unlockAudio();
+            audio.voiceOn = !audio.voiceOn;
+            e.currentTarget.textContent = audio.voiceOn ? '🔊 粵語發聲' : '🔇 靜音';
+            e.currentTarget.classList.toggle('text-emerald-300', audio.voiceOn);
+            e.currentTarget.classList.toggle('text-slate-400', !audio.voiceOn);
+            if (!audio.voiceOn) {
+                try {
+                    audio.cloudAudio.pause();
+                    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                } catch (err) {}
+            } else {
+                audio.speakCantonese(audio.lastLine);
+            }
+        });
+
+        window.addEventListener('resize', fitCanvas);
+        window.onload = fitCanvas;
+    </script>
+</body>
+</html>
